@@ -7,7 +7,7 @@
     </header>
 
     <section class="section">
-        <p class="page-meta">{{ total }} commit{% if total != 1 %}s{% endif %}</p>
+        <p class="page-meta commit-count">{{ total }} commit{% if total != 1 %}s{% endif %}</p>
         {% if !branch.is_empty() %}
         <p class="page-meta"><a href="{{ all_commits_href }}">All commits</a></p>
         {% endif %}

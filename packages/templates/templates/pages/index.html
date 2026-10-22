@@ -7,7 +7,7 @@
     </header>
 
     <section class="section">
-        <p class="page-meta">{{ repos.len() }} repositor{% if repos.len() == 1 %}y{% else %}ies{% endif %}</p>
+        <p class="page-meta repo-count">{{ repos.len() }} repositor{% if repos.len() == 1 %}y{% else %}ies{% endif %}</p>
 
         <div class="repo-grid">
             {% for repo in repos %}

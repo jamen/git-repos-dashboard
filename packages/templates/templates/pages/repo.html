@@ -11,7 +11,8 @@
 
         <div class="repo-columns">
             <section class="repo-section">
-                <h3><a class="repo-link" href="{{ branches_href }}">Branches</a></h3>
+                <h3 class="branches-heading"><a class="repo-link" href="{{ branches_href }}">Branches</a></h3>
+                <p class="page-meta branch-count">{{ branch_count }} branch{% if branch_count != 1 %}es{% endif %}</p>
                 <div class="branches">
                     {% for branch in branches %}
                     <section class="branch">

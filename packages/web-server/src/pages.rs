@@ -902,6 +902,7 @@ pub async fn repo_page_handler(
     let now = now_seconds();
     let title = format!("{} — Git Repos Dashboard", repo.name);
     let branches = library::branches(&repo);
+    let branch_count = branches.len();
     let branches = branch_rows(&repo.name, branches, now);
     let remotes = library::remotes(&repo)
         .into_iter()
@@ -934,6 +935,7 @@ pub async fn repo_page_handler(
         RepoPage {
             search_href: search_url,
             current_href: current_url,
+            branch_count,
             all_commits_href: commits_href(&repo.name, None, 1),
             branches_href: branches_href(&repo.name, 1),
             name: repo.name,

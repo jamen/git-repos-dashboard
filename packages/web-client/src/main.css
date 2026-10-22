@@ -86,7 +86,7 @@ h6 {
   flex: 1 0 auto;
   width: min(100% - 4rem, 90rem);
   margin-inline: auto;
-  padding: 2rem 2rem 0;
+  padding: 0 2rem;
   box-sizing: border-box;
 }
 
@@ -95,6 +95,7 @@ h6 {
   grid-template-columns: 1fr auto;
   align-items: center;
   gap: 0.25rem 1rem;
+  padding-top: 1.5rem;
   margin-bottom: 1rem;
   font-size: 1rem;
 }
@@ -177,6 +178,10 @@ h6 {
   margin-bottom: 1rem;
 }
 
+.repo-section > .branches-heading {
+  margin-bottom: 0.25rem;
+}
+
 .repo-columns {
   display: grid;
   grid-template-columns: repeat(2, minmax(0, 1fr));
@@ -187,7 +192,7 @@ h6 {
 .branches {
   display: flex;
   flex-direction: column;
-  gap: 2rem;
+  gap: 1.5rem;
 }
 
 .branch h3,
@@ -204,12 +209,22 @@ h6 {
   margin-bottom: 0.5rem;
 }
 
+.repo-count,
+.commit-count,
+.branch-count {
+  margin-bottom: 1rem;
+}
+
 .pagination {
   display: flex;
-  justify-content: flex-start;
+  justify-content: center;
   gap: 1rem;
   align-items: baseline;
-  margin: 1rem 0;
+  margin: 0 0 1rem;
+}
+
+.pagination:last-of-type {
+  margin: 1rem 0 0;
 }
 
 .pagination-disabled {
@@ -318,7 +333,8 @@ h6 {
   display: grid;
   grid-template-columns: max-content minmax(0, 1fr) max-content max-content;
   column-gap: 1rem;
-  row-gap: 0.35rem;
+  row-gap: 0.25rem;
+  line-height: 1.4;
 }
 
 .remote-row {
@@ -350,6 +366,7 @@ h6 {
 }
 
 .remote-activity {
+  text-align: right;
   font-size: 0.8125rem;
 }
 
@@ -431,7 +448,7 @@ body.search-open.search-expanded {
 
 .site-footer {
   flex: none;
-  margin-top: 0.5rem;
+  margin-top: 1rem;
   padding-bottom: 0.5rem;
 }
 

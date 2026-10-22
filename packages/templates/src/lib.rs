@@ -138,6 +138,7 @@ pub struct RepoPage {
     pub name: String,
     pub search_href: String,
     pub current_href: String,
+    pub branch_count: usize,
     pub all_commits_href: String,
     pub branches_href: String,
     pub branches: Vec<BranchRow>,
@@ -261,7 +262,7 @@ mod tests {
         assert!(html.contains(
             "<h1 class=\"title\"><a class=\"repo-link\" href=\"/\">Repositories</a></h1>"
         ));
-        assert!(html.contains("<p class=\"page-meta\">2 repositories</p>"));
+        assert!(html.contains("<p class=\"page-meta repo-count\">2 repositories</p>"));
         assert!(!html.contains("Featured"));
         assert!(!html.contains("<h2>Stats</h2>"));
         assert!(!html.contains("<dt>repositories</dt>"));
@@ -287,7 +288,7 @@ mod tests {
         assert!(html.contains("beta"));
 
         let count = html
-            .find("<p class=\"page-meta\">2 repositories</p>")
+            .find("<p class=\"page-meta repo-count\">2 repositories</p>")
             .unwrap();
         let repos = html.find("class=\"repo-grid\"").unwrap();
 
@@ -442,7 +443,7 @@ mod tests {
         assert!(html.contains(
             "<h1 class=\"title\"><a class=\"repo-link\" href=\"/\">Repositories</a> › <a class=\"repo-link\" href=\"/repos/alpha\">alpha</a> › <a class=\"repo-link\" href=\"/branches/alpha/main\">branch main</a> › <a class=\"repo-link\" href=\"/commits/alpha?branch=main\">commits</a></h1>"
         ));
-        assert!(html.contains("<p class=\"page-meta\">1 commit</p>"));
+        assert!(html.contains("<p class=\"page-meta commit-count\">1 commit</p>"));
         assert!(html.contains("<a href=\"/commits/alpha\">All commits</a>"));
 
         let count = html.find("1 commit").unwrap();
@@ -566,6 +567,7 @@ mod tests {
             name: "alpha".to_owned(),
             search_href: "/search?repo=alpha".to_owned(),
             current_href: "/repos/alpha".to_owned(),
+            branch_count: 2,
             all_commits_href: "/commits/alpha".to_owned(),
             branches_href: "/branches/alpha".to_owned(),
             branches: vec![
@@ -622,6 +624,7 @@ mod tests {
             "<h1 class=\"title\"><a class=\"repo-link\" href=\"/\">Repositories</a> › <a class=\"repo-link\" href=\"/repos/alpha\">alpha</a></h1>"
         ));
         assert!(html.contains("<a href=\"/commits/alpha\">All commits</a>"));
+        assert!(html.contains("<p class=\"page-meta branch-count\">2 branches</p>"));
         assert!(html.contains("class=\"repo-columns\""));
         assert!(html.contains("<a class=\"repo-link\" href=\"/branches/alpha\">Branches</a>"));
         assert!(html.contains("<h3>Remotes</h3>"));
