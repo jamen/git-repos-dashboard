@@ -110,7 +110,14 @@ async fn try_serve(cli: Cli) -> Result<(), TryServeError> {
 
     let router = Router::new()
         .route("/", get(pages::index_page_handler))
+        .route("/search", get(pages::search_page_handler))
+        .route("/commits/{repo}", get(pages::commits_page_handler))
         .route("/commits/{repo}/{hash}", get(pages::commit_page_handler))
+        .route("/branches/{repo}", get(pages::branches_page_handler))
+        .route(
+            "/branches/{repo}/{*branch}",
+            get(pages::branch_page_handler),
+        )
         .route("/repos/{repo}", get(pages::repo_page_handler))
         .nest("/assets", assets::Assets::router())
         .fallback(pages::not_found_page_handler)

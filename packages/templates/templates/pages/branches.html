@@ -1,0 +1,38 @@
+<main id="main" class="container">
+    <header class="site-header">
+        <h1 class="title"><a class="repo-link" href="/">Repositories</a> › <a class="repo-link" href="{{ repo_href }}">{{ repo }}</a> › <a class="repo-link" href="{{ current_href }}">branches</a></h1>
+        <div class="site-actions">
+            <a class="search-toggle" href="{{ search_href }}">Search</a>
+        </div>
+    </header>
+
+    <section class="section">
+        <p class="page-meta">{{ total }} branch{% if total != 1 %}es{% endif %}</p>
+
+        {% if branches.is_empty() %}
+        <p>No branches.</p>
+        {% else %}
+        <div class="branches">
+            {% for branch in branches %}
+            <section class="branch">
+                <h3><a class="repo-link" href="{{ branch.href }}">{{ branch.name }}</a></h3>
+                <div class="commit-list">
+                    {% for commit in branch.commits %}
+                    {% if commit.divider_before %}
+                    <div class="commit-divider" aria-hidden="true"></div>
+                    {% endif %}
+                    <a class="commit-row" href="{{ commit.href }}">
+                        <code class="commit-hash">{{ commit.hash }}</code>
+                        <span class="commit-message">{{ commit.summary }}</span>
+                        <span class="commit-time">{{ commit.when }}</span>
+                    </a>
+                    {% endfor %}
+                </div>
+            </section>
+            {% endfor %}
+        </div>
+        {% endif %}
+
+        {% include "components/pagination.html" %}
+    </section>
+</main>

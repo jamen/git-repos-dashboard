@@ -1,0 +1,7 @@
+<nav class="pagination" aria-label="Pagination">
+    {% if page > 1 %}<a href="{{ first }}">First</a>{% else %}<span class="pagination-disabled">First</span>{% endif %}
+    {% if let Some(prev) = prev %}<a href="{{ prev }}">Previous</a>{% else %}<span class="pagination-disabled">Previous</span>{% endif %}
+    <span class="pagination-page">Page {{ page }} of {{ pages }}</span>
+    {% if let Some(next) = next %}<a href="{{ next }}">Next</a>{% else %}<span class="pagination-disabled">Next</span>{% endif %}
+    {% if page < pages %}<a href="{{ last }}">Last</a>{% else %}<span class="pagination-disabled">Last</span>{% endif %}
+</nav>

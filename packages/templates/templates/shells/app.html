@@ -13,6 +13,21 @@
     </head>
     <body>
         {{ content|safe }}
+
+        <footer class="site-footer">
+            <div class="site-footer-inner">
+                <a href="#" data-hard>Back to top</a>
+                <span class="site-version">{{ version }}</span>
+            </div>
+        </footer>
+
+        <div id="search-overlay" class="search-overlay" data-search-overlay hidden>
+            <div class="search-overlay-inner">
+                {% include "components/search_form.html" %}
+                <div class="search-results" data-search-results aria-live="polite"></div>
+            </div>
+        </div>
+
         <script type="module">{{ js|safe }}</script>
     </body>
 </html>

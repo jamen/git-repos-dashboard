@@ -1,0 +1,16 @@
+<form class="search-form" action="/search" method="get" role="search" data-search-form>
+    <input
+        class="search-input"
+        data-search-input
+        type="search"
+        name="q"
+        placeholder="Search…"
+        autocomplete="off"
+        aria-label="Search"
+        aria-keyshortcuts="/"
+        value="{{ search.query }}"
+    />
+    <input type="hidden" name="repo" data-search-repo value="{{ search.repo }}"{% if search.repo.is_empty() %} disabled{% endif %} />
+    <input type="hidden" name="branch" data-search-branch value="{{ search.branch }}"{% if search.branch.is_empty() %} disabled{% endif %} />
+    <span class="search-scope" data-search-scope>{{ search.scope }}</span>
+</form>

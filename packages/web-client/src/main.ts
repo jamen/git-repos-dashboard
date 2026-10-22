@@ -187,6 +187,8 @@ async function navigate(url: URL, push: boolean): Promise<boolean> {
   }
 
   syncUrlBoundControls(canonical);
+  updateSearchScope();
+  closeSearch();
   focusAfterNavigation(fragment);
 
   document.dispatchEvent(new CustomEvent("partials:applied"));
@@ -252,6 +254,20 @@ document.addEventListener("submit", async (event) => {
   if (form.method.toLowerCase() !== "get") return;
   if (form.target && form.target !== "_self") return;
 
+  if (form.hasAttribute("data-search-form")) {
+    const input = form.querySelector<HTMLInputElement>("[data-search-input]");
+
+    if (!input?.value.trim()) {
+      event.preventDefault();
+
+      const { repo, branch } = currentSearchScope();
+      const target = scopeTarget(repo, branch);
+
+      if (!(await navigate(target, true))) location.href = target.href;
+      return;
+    }
+  }
+
   let url: URL;
 
   try {
@@ -297,3 +313,139 @@ document.addEventListener("pointerdown", (event) => {
 if ("scrollRestoration" in history) history.scrollRestoration = "manual";
 
 history.replaceState({ ...history.state, scroll: window.scrollY }, "");
+
+const searchOverlay = document.querySelector<HTMLElement>("[data-search-overlay]");
+const searchInput =
+  searchOverlay?.querySelector<HTMLInputElement>("[data-search-input]") ?? null;
+const searchScope =
+  searchOverlay?.querySelector<HTMLElement>("[data-search-scope]") ?? null;
+const searchRepo =
+  searchOverlay?.querySelector<HTMLInputElement>("[data-search-repo]") ?? null;
+const searchBranch =
+  searchOverlay?.querySelector<HTMLInputElement>("[data-search-branch]") ?? null;
+
+function decodeSegment(value: string): string {
+  try {
+    return decodeURIComponent(value);
+  } catch {
+    return value;
+  }
+}
+
+function currentSearchScope(): { repo: string | null; branch: string | null } {
+  const url = new URL(location.href);
+  const segments = url.pathname.split("/").filter(Boolean);
+
+  if (segments[0] === "search") {
+    const repo = url.searchParams.get("repo") || null;
+    const branch = repo ? url.searchParams.get("branch") || null : null;
+    return { repo, branch };
+  }
+
+  if (segments[0] === "repos" && segments[1]) {
+    return { repo: decodeSegment(segments[1]), branch: null };
+  }
+
+  if (segments[0] === "branches" && segments[1]) {
+    return {
+      repo: decodeSegment(segments[1]),
+      branch:
+        segments.length > 2
+          ? segments.slice(2).map(decodeSegment).join("/")
+          : null,
+    };
+  }
+
+  if (segments[0] === "commits" && segments[1]) {
+    return {
+      repo: decodeSegment(segments[1]),
+      branch: segments.length === 2 ? url.searchParams.get("branch") : null,
+    };
+  }
+
+  return { repo: null, branch: null };
+}
+
+function updateSearchScope() {
+  const { repo, branch } = currentSearchScope();
+
+  if (searchScope) {
+    const label = branch ? `${repo} / ${branch}` : (repo ?? "all repositories");
+    searchScope.textContent = `in ${label}`;
+  }
+
+  if (searchRepo) {
+    searchRepo.value = repo ?? "";
+    searchRepo.disabled = repo === null;
+  }
+
+  if (searchBranch) {
+    searchBranch.value = branch ?? "";
+    searchBranch.disabled = branch === null;
+  }
+}
+
+function updateSearchExpansion() {
+  if (!searchOverlay || !searchInput) return;
+
+  const expanded = !searchOverlay.hidden && searchInput.value.length > 0;
+
+  searchOverlay.classList.toggle("search-expanded", expanded);
+  document.body.classList.toggle("search-expanded", expanded);
+}
+
+function openSearch() {
+  if (!searchOverlay || !searchInput) return;
+
+  updateSearchScope();
+  searchOverlay.hidden = false;
+  document.body.classList.add("search-open");
+  updateSearchExpansion();
+  searchInput.focus();
+  searchInput.select();
+}
+
+function closeSearch() {
+  if (!searchOverlay || !searchInput) return;
+
+  searchOverlay.hidden = true;
+  searchOverlay.classList.remove("search-expanded");
+  document.body.classList.remove("search-open", "search-expanded");
+  searchInput.value = "";
+  searchInput.blur();
+}
+
+function scopeTarget(repo: string | null, branch: string | null): URL {
+  if (!repo) return new URL("/", location.origin);
+
+  if (!branch) {
+    return new URL(`/repos/${encodeURIComponent(repo)}`, location.origin);
+  }
+
+  const branchPath = branch.split("/").map(encodeURIComponent).join("/");
+  return new URL(
+    `/branches/${encodeURIComponent(repo)}/${branchPath}`,
+    location.origin,
+  );
+}
+
+document.addEventListener("keydown", (event) => {
+  if (event.defaultPrevented) return;
+
+  const target = event.target;
+  const typing =
+    target instanceof HTMLElement &&
+    (target.isContentEditable || target.matches("input, textarea, select"));
+
+  if (event.key === "/" && !typing && !event.metaKey && !event.ctrlKey && !event.altKey) {
+    event.preventDefault();
+    openSearch();
+  } else if (event.key === "Escape" && searchOverlay && !searchOverlay.hidden) {
+    event.preventDefault();
+    closeSearch();
+  }
+});
+
+searchInput?.addEventListener("input", updateSearchExpansion);
+
+updateSearchScope();

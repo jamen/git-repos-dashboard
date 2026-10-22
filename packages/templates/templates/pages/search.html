@@ -1,0 +1,13 @@
+<main id="main" class="container">
+    <header class="site-header">
+        <h1 class="title"><a class="repo-link" href="/">Repositories</a> › <a class="repo-link" href="{{ current_href }}">search</a></h1>
+        <div class="site-actions">
+            <a class="search-toggle" href="{{ search_href }}">Search</a>
+        </div>
+    </header>
+
+    <section class="section">
+        {% include "components/search_form.html" %}
+        <div class="search-results search-results-page" data-search-results aria-live="polite"></div>
+    </section>
+</main>

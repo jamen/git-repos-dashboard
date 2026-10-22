@@ -47,6 +47,7 @@ pub struct ActivityCommit {
 pub struct CommitDetails {
     pub short: String,
     pub hash: String,
+    pub branch: Option<String>,
     pub summary: String,
     pub message: String,
     pub author: String,
@@ -56,13 +57,28 @@ pub struct CommitDetails {
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct Branch {
     pub name: String,
-    pub commits: Vec<Commit>,
+    pub commits: Vec<BranchCommit>,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct BranchCommit {
+    pub commit: Commit,
+    pub is_new: bool,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct Remote {
     pub name: String,
     pub url: String,
+    pub ahead: Option<usize>,
+    pub behind: Option<usize>,
+    pub activity: Option<i64>,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct RemoteGroup {
+    pub name: String,
+    pub remotes: Vec<String>,
 }
 
 impl Repo {
@@ -132,6 +148,14 @@ pub async fn find(store: &Store, name: &str) -> Result<Option<Repo>, QueryError>
         .find(|repo| repo.name == name))
 }
 
+pub fn branch_exists(repo: &Repo, name: &str) -> bool {
+    let Ok(repository) = Repository::open_bare(&repo.git_dir) else {
+        return false;
+    };
+
+    repository.find_branch(name, BranchType::Local).is_ok()
+}
+
 pub fn branches(repo: &Repo) -> Vec<Branch> {
     let Ok(repository) = Repository::open_bare(&repo.git_dir) else {
         return Vec::new();
@@ -140,6 +164,9 @@ pub fn branches(repo: &Repo) -> Vec<Branch> {
         return Vec::new();
     };
 
+    let default = default_branch(&repository, repo.bare);
+    let default_name = default.as_ref().map(|(name, _)| name.clone());
+    let default_oid = default.as_ref().map(|(_, oid)| *oid);
     let mut result = Vec::new();
 
     for branch in branches.flatten() {
@@ -159,12 +186,25 @@ pub fn branches(repo: &Repo) -> Vec<Branch> {
         }
 
         let _ = walk.set_sorting(Sort::TIME);
+        let is_default = default_name.as_deref() == Some(name);
 
-        let commits: Vec<Commit> = walk
+        let commits: Vec<BranchCommit> = walk
             .filter_map(Result::ok)
             .take(BRANCH_COMMIT_LIMIT)
             .filter_map(|oid| repository.find_commit(oid).ok())
-            .map(|commit| commit_row(&commit))
+            .map(|commit| {
+                let is_new = match default_oid {
+                    Some(base_oid) if !is_default => {
+                        !is_in_base(&repository, base_oid, commit.id())
+                    }
+                    _ => false,
+                };
+
+                BranchCommit {
+                    commit: commit_row(&commit),
+                    is_new,
+                }
+            })
             .collect();
 
         if !commits.is_empty() {
@@ -176,13 +216,213 @@ pub fn branches(repo: &Repo) -> Vec<Branch> {
     }
 
     result.sort_by(|a, b| {
-        let a_time = a.commits.first().map_or(0, |commit| commit.time);
-        let b_time = b.commits.first().map_or(0, |commit| commit.time);
+        let a_time = a.commits.first().map_or(0, |commit| commit.commit.time);
+        let b_time = b.commits.first().map_or(0, |commit| commit.commit.time);
 
         b_time.cmp(&a_time).then_with(|| a.name.cmp(&b.name))
     });
 
     result
+}
+
+pub fn remote_groups(repo: &Repo) -> Vec<RemoteGroup> {
+    let Ok(repository) = Repository::open_bare(&repo.git_dir) else {
+        return Vec::new();
+    };
+    let Ok(config) = repository.config() else {
+        return Vec::new();
+    };
+    let Ok(mut entries) = config.entries(Some("remotes.*")) else {
+        return Vec::new();
+    };
+
+    let mut groups: Vec<RemoteGroup> = Vec::new();
+
+    while let Some(entry) = entries.next() {
+        let Ok(entry) = entry else {
+            continue;
+        };
+        let Ok(name) = entry.name() else {
+            continue;
+        };
+        let Some(name) = name.strip_prefix("remotes.") else {
+            continue;
+        };
+
+        if !entry.has_value() {
+            continue;
+        }
+
+        let Ok(value) = entry.value() else {
+            continue;
+        };
+
+        for remote in value.split_whitespace() {
+            if let Some(group) = groups.iter_mut().find(|group| group.name == name) {
+                group.remotes.push(remote.to_owned());
+            } else {
+                groups.push(RemoteGroup {
+                    name: name.to_owned(),
+                    remotes: vec![remote.to_owned()],
+                });
+            }
+        }
+    }
+
+    groups.sort_by(|a, b| a.name.cmp(&b.name));
+    groups
+}
+
+pub fn commit_total(repo: &Repo, branch: Option<&str>) -> Option<usize> {
+    let repository = Repository::open_bare(&repo.git_dir).ok()?;
+    let mut walk = repository.revwalk().ok()?;
+
+    if !push_scope(&repository, &mut walk, branch) {
+        return Some(0);
+    }
+
+    Some(walk.filter_map(Result::ok).count())
+}
+
+pub fn commits(
+    repo: &Repo,
+    branch: Option<&str>,
+    offset: usize,
+    limit: usize,
+) -> Vec<BranchCommit> {
+    let Ok(repository) = Repository::open_bare(&repo.git_dir) else {
+        return Vec::new();
+    };
+    let Ok(mut walk) = repository.revwalk() else {
+        return Vec::new();
+    };
+
+    if walk.set_sorting(Sort::TIME).is_err() {
+        return Vec::new();
+    }
+
+    if !push_scope(&repository, &mut walk, branch) {
+        return Vec::new();
+    }
+
+    let default = default_branch(&repository, repo.bare);
+    let default_name = default.as_ref().map(|(name, _)| name.clone());
+    let default_oid = default.as_ref().map(|(_, oid)| *oid);
+    let base_oid = if branch.is_some() && branch != default_name.as_deref() {
+        default_oid
+    } else {
+        None
+    };
+
+    walk.filter_map(Result::ok)
+        .skip(offset)
+        .take(limit)
+        .filter_map(|oid| repository.find_commit(oid).ok())
+        .map(|commit| {
+            let is_new =
+                base_oid.is_some_and(|base_oid| !is_in_base(&repository, base_oid, commit.id()));
+
+            BranchCommit {
+                commit: commit_row(&commit),
+                is_new,
+            }
+        })
+        .collect()
+}
+
+fn head_branch(repository: &Repository) -> Option<(String, git2::Oid)> {
+    let head = repository.head().ok()?;
+    let name = head.shorthand().ok()?.to_owned();
+    let oid = head.peel_to_commit().ok()?.id();
+
+    Some((name, oid))
+}
+
+fn local_branch(repository: &Repository, name: &str) -> Option<git2::Oid> {
+    repository
+        .find_branch(name, BranchType::Local)
+        .ok()
+        .and_then(|branch| branch.get().target())
+}
+
+fn default_branch(repository: &Repository, bare: bool) -> Option<(String, git2::Oid)> {
+    if bare {
+        return head_branch(repository);
+    }
+
+    if let Ok(remotes) = repository.remotes() {
+        for remote in remotes.iter().filter_map(|remote| remote.ok().flatten()) {
+            let reference_name = format!("refs/remotes/{remote}/HEAD");
+            let Ok(reference) = repository.find_reference(&reference_name) else {
+                continue;
+            };
+            let Ok(Some(target)) = reference.symbolic_target() else {
+                continue;
+            };
+            let prefix = format!("refs/remotes/{remote}/");
+            let Some(name) = target.strip_prefix(&prefix) else {
+                continue;
+            };
+
+            if let Some(oid) = local_branch(repository, name) {
+                return Some((name.to_owned(), oid));
+            }
+        }
+    }
+
+    let configured = repository
+        .config()
+        .ok()
+        .and_then(|config| config.get_string("init.defaultBranch").ok());
+
+    for name in configured
+        .iter()
+        .map(String::as_str)
+        .chain(["main", "master"])
+    {
+        if let Some(oid) = local_branch(repository, name) {
+            return Some((name.to_owned(), oid));
+        }
+    }
+
+    head_branch(repository)
+}
+
+fn is_in_base(repository: &Repository, base: git2::Oid, commit: git2::Oid) -> bool {
+    commit == base
+        || repository
+            .graph_descendant_of(base, commit)
+            .unwrap_or(false)
+}
+
+fn unique_branch(repository: &Repository, commit: git2::Oid) -> Option<String> {
+    let Ok(branches) = repository.branches(Some(BranchType::Local)) else {
+        return None;
+    };
+
+    let mut found = None;
+
+    for (branch, _) in branches.flatten() {
+        let Some(target) = branch.get().target() else {
+            continue;
+        };
+
+        if !is_in_base(repository, target, commit) {
+            continue;
+        }
+
+        let Some(name) = branch.name().ok().flatten() else {
+            continue;
+        };
+
+        if found.is_some() {
+            return None;
+        }
+
+        found = Some(name.to_owned());
+    }
+
+    found
 }
 
 pub fn remotes(repo: &Repo) -> Vec<Remote> {
@@ -193,6 +433,12 @@ pub fn remotes(repo: &Repo) -> Vec<Remote> {
         return Vec::new();
     };
 
+    let head = repository.head().ok();
+    let head_branch = head
+        .as_ref()
+        .and_then(|head| head.shorthand().ok())
+        .map(str::to_owned);
+    let head_oid = head.as_ref().and_then(|head| head.target());
     let mut result = Vec::new();
 
     for name in remotes.iter().filter_map(|name| name.ok().flatten()) {
@@ -200,9 +446,22 @@ pub fn remotes(repo: &Repo) -> Vec<Remote> {
             continue;
         };
 
+        let (ahead, behind) = match (head_branch.as_deref(), head_oid) {
+            (Some(branch), Some(local_oid)) => repository
+                .find_branch(&format!("{name}/{branch}"), BranchType::Remote)
+                .ok()
+                .and_then(|branch| branch.get().target())
+                .and_then(|remote_oid| repository.graph_ahead_behind(local_oid, remote_oid).ok())
+                .map_or((None, None), |(ahead, behind)| (Some(ahead), Some(behind))),
+            _ => (None, None),
+        };
+
         result.push(Remote {
             name: name.to_owned(),
             url: remote.url().unwrap_or_default().to_owned(),
+            ahead,
+            behind,
+            activity: remote_activity(&repository, name),
         });
     }
 
@@ -210,14 +469,39 @@ pub fn remotes(repo: &Repo) -> Vec<Remote> {
     result
 }
 
+fn remote_activity(repository: &Repository, remote: &str) -> Option<i64> {
+    let references = repository
+        .references_glob(&format!("refs/remotes/{remote}/*"))
+        .ok()?;
+    let mut latest = None;
+
+    for reference in references.flatten() {
+        let Ok(name) = reference.name() else {
+            continue;
+        };
+        let Ok(reflog) = repository.reflog(name) else {
+            continue;
+        };
+
+        for entry in reflog.iter() {
+            let time = entry.committer().when().seconds();
+            latest = Some(latest.map_or(time, |current: i64| current.max(time)));
+        }
+    }
+
+    latest
+}
+
 pub fn find_commit(repo: &Repo, revision: &str) -> Option<CommitDetails> {
     let repository = Repository::open_bare(&repo.git_dir).ok()?;
     let object = repository.revparse_single(revision).ok()?;
     let commit = object.peel_to_commit().ok()?;
+    let branch = unique_branch(&repository, commit.id());
 
     Some(CommitDetails {
         short: short_hash(&commit),
         hash: commit.id().to_string(),
+        branch,
         summary: commit
             .summary()
             .ok()
@@ -356,6 +640,22 @@ fn commit_count(repository: &Repository) -> u64 {
     walk.filter_map(Result::ok).count() as u64
 }
 
+fn push_scope(repository: &Repository, walk: &mut Revwalk<'_>, branch: Option<&str>) -> bool {
+    match branch {
+        Some(name) => {
+            let Ok(branch) = repository.find_branch(name, BranchType::Local) else {
+                return false;
+            };
+            let Some(oid) = branch.get().target() else {
+                return false;
+            };
+
+            walk.push(oid).is_ok()
+        }
+        None => push_branches(repository, walk),
+    }
+}
+
 fn push_branches(repository: &Repository, walk: &mut Revwalk<'_>) -> bool {
     let mut pushed = false;
 
@@ -477,6 +777,20 @@ mod tests {
         repository
             .remote("origin", "https://example.com/alpha.git")
             .unwrap();
+        repository
+            .remote("mirror", "https://example.com/mirror.git")
+            .unwrap();
+
+        let mut config = repository.config().unwrap();
+        config
+            .set_multivar("remotes.all", "^$", "origin mirror")
+            .unwrap();
+        config
+            .set_multivar("remotes.multi", "^$", "origin")
+            .unwrap();
+        config
+            .set_multivar("remotes.multi", "^$", "mirror")
+            .unwrap();
 
         let initial_signature = git2::Signature::new(
             "Test",
@@ -509,6 +823,15 @@ mod tests {
                 "Initial commit",
                 &tree,
                 &[],
+            )
+            .unwrap();
+
+        repository
+            .reference(
+                &format!("refs/remotes/origin/{main_branch}"),
+                initial,
+                true,
+                "fetch origin",
             )
             .unwrap();
 
@@ -625,17 +948,64 @@ mod tests {
         let commit = find_commit(repo, &repo.head_commit.as_ref().unwrap().hash).unwrap();
         assert_eq!(commit.summary, "Initial commit");
         assert_eq!(commit.author, "Test");
+        assert_eq!(commit.branch, None);
+
+        let repository = Repository::open_bare(&repo.git_dir).unwrap();
+        let feature = repository
+            .find_reference("refs/heads/feature")
+            .unwrap()
+            .peel_to_commit()
+            .unwrap();
+        let feature_commit = find_commit(repo, &feature.id().to_string()).unwrap();
+        assert_eq!(feature_commit.branch.as_deref(), Some("feature"));
 
         let remote_list = remotes(repo);
-        assert_eq!(remote_list.len(), 1);
-        assert_eq!(remote_list[0].name, "origin");
-        assert_eq!(remote_list[0].url, "https://example.com/alpha.git");
+        assert_eq!(remote_list.len(), 2);
+
+        let mirror = &remote_list[0];
+        assert_eq!(mirror.name, "mirror");
+        assert_eq!(mirror.url, "https://example.com/mirror.git");
+        assert_eq!(mirror.ahead, None);
+        assert_eq!(mirror.behind, None);
+        assert_eq!(mirror.activity, None);
+
+        let origin = &remote_list[1];
+        assert_eq!(origin.name, "origin");
+        assert_eq!(origin.url, "https://example.com/alpha.git");
+        assert_eq!(origin.ahead, Some(0));
+        assert_eq!(origin.behind, Some(0));
+        assert!(origin.activity.is_some());
+
+        let group_list = remote_groups(repo);
+        assert_eq!(group_list.len(), 2);
+        assert_eq!(group_list[0].name, "all");
+        assert_eq!(group_list[0].remotes, ["origin", "mirror"]);
+        assert_eq!(group_list[1].name, "multi");
+        assert_eq!(group_list[1].remotes, ["origin", "mirror"]);
 
         let feed = activity(&store).await.unwrap();
         assert_eq!(feed.len(), 2);
         assert_eq!(feed[0].repo, "alpha");
         assert_eq!(feed[0].commit.summary, "Feature change");
         assert_eq!(feed[1].commit.summary, "Initial commit");
+
+        let all = commits(repo, None, 0, 10);
+        assert_eq!(all.len(), 2);
+        assert_eq!(all[0].commit.summary, "Feature change");
+        assert!(all.iter().all(|commit| !commit.is_new));
+
+        assert_eq!(commit_total(repo, None), Some(2));
+        assert_eq!(commit_total(repo, Some("main")), Some(1));
+
+        let main = commits(repo, Some("main"), 0, 10);
+        assert_eq!(main.len(), 1);
+        assert_eq!(main[0].commit.summary, "Initial commit");
+        assert!(!main[0].is_new);
+
+        let feature = commits(repo, Some("feature"), 0, 10);
+        assert_eq!(feature.len(), 2);
+        assert!(feature[0].is_new);
+        assert!(!feature[1].is_new);
 
         let _ = fs::remove_dir_all(&root);
         let _ = fs::remove_file(&database);

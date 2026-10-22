@@ -28,10 +28,21 @@ cargo test
 defaults to `./library`. Working-tree repos (`<repo>/.git`) and bare repos
 (`<repo>.git`) are scanned at startup and listed on the index page, ordered
 by their most recent activity. Each repo shows its commit count, size, and up
-to 3 recent commits with relative times. Repository pages list branches with
-their recent commits: up to 3 per branch, totaling at least 5 (or 5 from the
-only branch), followed by a Remotes section. A “Show more” link is a
-placeholder for later. Commits link to
+to 3 recent commits with relative times. Repository pages list recent
+branches with their commits: up to 3 per branch, totaling at least 5 (or 5
+from the only branch), followed by a Remotes section showing local ahead/behind
+status and latest reflog activity, plus configured remote groups with their
+members space-separated. The Branches subheading
+and “Show more” link go to the paginated `/branches/<repo>` list, which shows
+each branch with up to 3 recent commits. Branch names link to a dedicated
+`/branches/<repo>/<branch>` page with a compact commit list and a “More
+commits” link. Commit counts
+link to a paginated `/commits/<repo>` view, which also accepts
+`?branch=<name>` to filter by branch. Branch-specific commit lists place
+commits not reachable from the repository’s
+default branch above an “existing history” divider. Bare repos use `HEAD`;
+working trees resolve a remote’s `HEAD` branch or fall back through
+`init.defaultBranch`, `main`, `master`, and `HEAD`. Individual commits link to
 `/commits/<repo>/<hash>`, and repository names link to `/repos/<repo>`.
 Metadata is read with `git2` (libgit2).
 
