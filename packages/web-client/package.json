@@ -1,0 +1,15 @@
+{
+  "name": "web-client",
+  "private": true,
+  "version": "0.1.0",
+  "type": "module",
+  "scripts": {
+    "build": "pnpm check && vite build",
+    "check": "tsc --noEmit -p tsconfig.json"
+  },
+  "devDependencies": {
+    "@types/node": "^26.2.0",
+    "typescript": "~5.9.0",
+    "vite": "^6.3.5"
+  }
+}

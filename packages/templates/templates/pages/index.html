@@ -1,0 +1,26 @@
+<main id="main" class="container">
+    <header class="site-header">
+        <h1 class="title"><a href="/">git-repos-dashboard</a></h1>
+        <p class="repo-count">{{ repos.len() }} repositor{% if repos.len() == 1 %}y{% else %}ies{% endif %}</p>
+    </header>
+
+    <section class="section">
+        <div class="repo-grid">
+            {% for repo in repos %}
+            <article class="card">
+                <h3><a class="repo-link" href="{{ repo.href }}">{{ repo.name }}</a></h3>
+                <p class="repo-meta">{{ repo.commits }} commit{% if repo.commits != 1 %}s{% endif %}, {{ repo.size }}</p>
+                <div class="commit-list">
+                    {% for commit in repo.recent %}
+                    <a class="commit-hash" href="{{ commit.href }}"><code>{{ commit.hash }}</code></a>
+                    <a class="commit-message" href="{{ commit.href }}">{{ commit.summary }}</a>
+                    <span class="commit-time">{{ commit.when }}</span>
+                    {% endfor %}
+                </div>
+            </article>
+            {% endfor %}
+        </div>
+    </section>
+
+    <footer class="site-footer"></footer>
+</main>

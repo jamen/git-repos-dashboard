@@ -1,0 +1,10 @@
+[workspace]
+members = [ "packages/*" ]
+exclude = [ "packages/web-client" ]
+resolver = "3"
+
+# Optimise dependencies even in debug builds, but not this workspace's own
+# crates — so rebuilds stay fast while the dependencies that do the heavy
+# lifting do not run interpreted-slow.
+[profile.dev.package."*"]
+opt-level = 2

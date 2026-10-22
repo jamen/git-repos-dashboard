@@ -1,0 +1,45 @@
+<main id="main" class="container">
+    <header class="site-header">
+        <h1 class="title"><a href="/">git-repos-dashboard</a></h1>
+    </header>
+
+    <section class="section">
+        <h2>{{ name }}</h2>
+
+        <div class="repo-columns">
+            <section class="repo-section">
+                <h3>Branches</h3>
+                <div class="branches">
+                    {% for branch in branches %}
+                    <section class="branch">
+                        <h4>{{ branch.name }}</h4>
+                        <div class="commit-list">
+                            {% for commit in branch.commits %}
+                            <a class="commit-hash" href="{{ commit.href }}"><code>{{ commit.hash }}</code></a>
+                            <a class="commit-message" href="{{ commit.href }}">{{ commit.summary }}</a>
+                            <span class="commit-time">{{ commit.when }}</span>
+                            {% endfor %}
+                        </div>
+                    </section>
+                    {% endfor %}
+                </div>
+
+                <a class="show-more" href="?show=all">Show more</a>
+            </section>
+
+            <section class="repo-section">
+                <h3>Remotes</h3>
+                {% if remotes.is_empty() %}
+                <p>No remotes.</p>
+                {% else %}
+                <dl class="details">
+                    {% for remote in remotes %}
+                    <dt>{{ remote.name }}</dt>
+                    <dd>{% if remote.url.is_empty() %}—{% else %}{{ remote.url }}{% endif %}</dd>
+                    {% endfor %}
+                </dl>
+                {% endif %}
+            </section>
+        </div>
+    </section>
+</main>

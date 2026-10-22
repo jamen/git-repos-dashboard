@@ -1,0 +1,22 @@
+[package]
+name = "web-server"
+version = "0.1.0"
+edition = "2024"
+
+[dependencies]
+store = { path = "../store" }
+templates = { path = "../templates" }
+argh = "0.1.13"
+askama = "0.16.0"
+axum = "0.8.9"
+derive_more = { version = "2.1.1", features = ["error", "display"] }
+git2 = { version = "0.21.0", default-features = false, features = ["vendored-libgit2"] }
+percent-encoding = "2.3.2"
+serde = { version = "1", features = ["derive"] }
+tokio = { version = "1.48.0", features = ["rt-multi-thread", "macros", "net"] }
+tracing = "0.1.44"
+tracing-subscriber = { version = "0.3.22", features = ["env-filter", "std"] }
+
+[dependencies.tower-http]
+version = "0.6.6"
+features = ["compression-br", "compression-gzip"]

@@ -1,0 +1,18 @@
+<!doctype html>
+<html lang="en">
+    <head>
+        <meta charset="utf-8" />
+        <meta name="viewport" content="width=device-width, initial-scale=1" />
+        <meta id="shell" name="shell" content="{{ shell_id }}" />
+        <link rel="icon" type="image/svg+xml" href="/assets/favicon.svg" />
+        <title id="title">{{ meta.title }}</title>
+        {% if !meta.description.is_empty() %}
+        <meta id="description" name="description" content="{{ meta.description }}" />
+        {% endif %}
+        <style>{{ css|safe }}</style>
+    </head>
+    <body>
+        {{ content|safe }}
+        <script type="module">{{ js|safe }}</script>
+    </body>
+</html>

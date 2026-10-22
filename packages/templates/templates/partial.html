@@ -1,0 +1,4 @@
+<title id="title">{{ meta.title }}</title>
+{% if !meta.description.is_empty() %}<meta id="description" name="description" content="{{ meta.description }}" />{% endif %}
+<meta id="shell" name="shell" content="{{ shell_id }}" />
+{{ content|safe }}
